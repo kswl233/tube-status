@@ -1,0 +1,696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>London Tube Status Monitor</title>
+    <style>
+        :root {
+            --primary: #0019a8;
+            --secondary: #dc241f;
+            --light: #f5f5f5;
+            --dark: #222;
+            --success: #00a65a;
+            --warning: #ff851b;
+            --danger: #dd4b39;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--light);
+            color: var(--dark);
+            margin: 0;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        
+        h1 {
+            color: var(--primary);
+            text-align: center;
+            margin-bottom: 20px;
+        }
+        
+        .status-panel {
+            margin-bottom: 30px;
+        }
+        
+        .tube-line {
+            display: flex;
+            align-items: center;
+            padding: 10px;
+            margin-bottom: 10px;
+            border-radius: 5px;
+            background-color: white;
+            border: 1px solid #ddd;
+        }
+        
+        .line-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        
+        .line-status {
+            margin-left: auto;
+            font-weight: bold;
+            padding: 5px 10px;
+            border-radius: 4px;
+        }
+        
+        .good-service {
+            background-color: var(--success);
+            color: white;
+        }
+        
+        .minor-delays {
+            background-color: var(--warning);
+            color: white;
+        }
+        
+        .severe-delays, .suspended {
+            background-color: var(--danger);
+            color: white;
+        }
+        
+        .settings-panel {
+            background-color: #f9f9f9;
+            padding: 15px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+        }
+        
+        .settings-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        
+        .settings-section {
+            flex: 1;
+            min-width: 200px;
+        }
+        
+        h3 {
+            margin-top: 0;
+            margin-bottom: 10px;
+            color: var(--primary);
+        }
+        
+        label {
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        input[type="checkbox"], input[type="radio"] {
+            margin-right: 5px;
+        }
+        
+        input[type="time"], select {
+            padding: 5px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+        }
+        
+        button {
+            background-color: var(--primary);
+            color: white;
+            border: none;
+            padding: 10px 15px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+        
+        button:hover {
+            background-color: #001076;
+        }
+        
+        .status-message {
+            text-align: center;
+            margin: 10px 0;
+            padding: 10px;
+            border-radius: 4px;
+        }
+        
+        .error {
+            background-color: #ffecec;
+            color: var(--danger);
+        }
+        
+        .success {
+            background-color: #eaffea;
+            color: var(--success);
+        }
+        
+        .line-checkboxes {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            gap: 5px;
+        }
+        
+        @media (max-width: 600px) {
+            .settings-row {
+                flex-direction: column;
+            }
+            
+            .settings-section {
+                width: 100%;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>London Tube Status Monitor</h1>
+        
+        <div class="status-message" id="statusMessage" style="display: none;"></div>
+        
+        <div class="settings-panel">
+            <div class="settings-row">
+                <div class="settings-section">
+                    <h3>Line Selection</h3>
+                    <div class="line-checkboxes" id="lineSelection">
+                        <!-- Line checkboxes will be generated here -->
+                    </div>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Days to Monitor</h3>
+                    <label>
+                        <input type="radio" name="days" value="weekdays" checked> Weekdays only
+                    </label>
+                    <label>
+                        <input type="radio" name="days" value="weekends"> Weekends only
+                    </label>
+                    <label>
+                        <input type="radio" name="days" value="all"> All days
+                    </label>
+                    <div id="customDays" style="display: none; margin-top: 10px;">
+                        <label><input type="checkbox" value="1"> Monday</label>
+                        <label><input type="checkbox" value="2"> Tuesday</label>
+                        <label><input type="checkbox" value="3"> Wednesday</label>
+                        <label><input type="checkbox" value="4"> Thursday</label>
+                        <label><input type="checkbox" value="5"> Friday</label>
+                        <label><input type="checkbox" value="6"> Saturday</label>
+                        <label><input type="checkbox" value="0"> Sunday</label>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="settings-row">
+                <div class="settings-section">
+                    <h3>Morning Window</h3>
+                    <label>Start:
+                        <input type="time" id="morningStart" value="07:45">
+                    </label>
+                    <label>End:
+                        <input type="time" id="morningEnd" value="08:30">
+                    </label>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Evening Window</h3>
+                    <label>Start:
+                        <input type="time" id="eveningStart" value="17:15">
+                    </label>
+                    <label>End:
+                        <input type="time" id="eveningEnd" value="18:30">
+                    </label>
+                </div>
+                
+                <div class="settings-section">
+                    <h3>Refresh Rate</h3>
+                    <select id="refreshRate">
+                        <option value="60000">1 minute</option>
+                        <option value="180000">3 minutes</option>
+                        <option value="300000" selected>5 minutes</option>
+                        <option value="600000">10 minutes</option>
+                    </select>
+                </div>
+            </div>
+            
+            <button id="saveSettings">Save Settings</button>
+            <button id="startMonitoring" style="margin-left: 10px;">Start Monitoring</button>
+        </div>
+        
+        <div class="status-panel" id="tubeStatus">
+            <!-- Tube status will be displayed here -->
+            <div class="tube-line">
+                <div class="line-color" style="background-color: #0019a8;"></div>
+                <div class="line-name">Loading tube lines...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Define tube lines with their colors
+        const tubeLines = [
+            { id: 'bakerloo', name: 'Bakerloo', color: '#B36305' },
+            { id: 'central', name: 'Central', color: '#E32017' },
+            { id: 'circle', name: 'Circle', color: '#FFD300' },
+            { id: 'district', name: 'District', color: '#00782A' },
+            { id: 'hammersmith-city', name: 'Hammersmith & City', color: '#F3A9BB' },
+            { id: 'jubilee', name: 'Jubilee', color: '#A0A5A9' },
+            { id: 'metropolitan', name: 'Metropolitan', color: '#9B0056' },
+            { id: 'northern', name: 'Northern', color: '#000000' },
+            { id: 'piccadilly', name: 'Piccadilly', color: '#003688' },
+            { id: 'victoria', name: 'Victoria', color: '#0098D4' },
+            { id: 'waterloo-city', name: 'Waterloo & City', color: '#95CDBA' },
+            { id: 'dlr', name: 'DLR', color: '#00A4A7' },
+            { id: 'london-overground', name: 'Overground', color: '#EE7C0E' },
+            { id: 'elizabeth', name: 'Elizabeth', color: '#6950A1' }
+        ];
+
+        // State variables
+        let timer = null;
+        let previousStatuses = {};
+        let monitoringActive = false;
+        
+        // Fixed API key - no longer requiring user input
+        const API_KEY = "fbb8ec8c081c40ccbc660a59323383dc";
+        
+        // Initialize the app when the DOM is ready
+        document.addEventListener('DOMContentLoaded', () => {
+            // Generate line checkboxes
+            generateLineCheckboxes();
+            
+            // Load saved settings
+            loadSettings();
+            
+            // Initialize event listeners
+            initializeEventListeners();
+            
+            // Check for notification permission
+            checkNotificationPermission();
+        });
+        
+        // Generate line checkboxes based on the tubeLines array
+        function generateLineCheckboxes() {
+            const lineSelectionDiv = document.getElementById('lineSelection');
+            
+            tubeLines.forEach(line => {
+                const label = document.createElement('label');
+                const checkbox = document.createElement('input');
+                checkbox.type = 'checkbox';
+                checkbox.value = line.id;
+                checkbox.id = `line-${line.id}`;
+                
+                // Pre-select Victoria and Central lines by default
+                if (line.id === 'victoria' || line.id === 'central') {
+                    checkbox.checked = true;
+                }
+                
+                const colorSpan = document.createElement('span');
+                colorSpan.style.display = 'inline-block';
+                colorSpan.style.width = '12px';
+                colorSpan.style.height = '12px';
+                colorSpan.style.backgroundColor = line.color;
+                colorSpan.style.marginRight = '5px';
+                colorSpan.style.borderRadius = '50%';
+                
+                label.appendChild(checkbox);
+                label.appendChild(colorSpan);
+                label.appendChild(document.createTextNode(line.name));
+                
+                lineSelectionDiv.appendChild(label);
+            });
+        }
+        
+        // Initialize event listeners
+        function initializeEventListeners() {
+            // Save settings button
+            document.getElementById('saveSettings').addEventListener('click', saveSettings);
+            
+            // Start/stop monitoring button
+            document.getElementById('startMonitoring').addEventListener('click', toggleMonitoring);
+            
+            // Custom days toggle
+            const dayRadios = document.querySelectorAll('input[name="days"]');
+            dayRadios.forEach(radio => {
+                radio.addEventListener('change', function() {
+                    document.getElementById('customDays').style.display = 
+                        this.value === 'custom' ? 'block' : 'none';
+                });
+            });
+        }
+        
+        // Save settings to localStorage
+        function saveSettings() {
+            const settings = {
+                lines: Array.from(document.querySelectorAll('#lineSelection input:checked')).map(cb => cb.value),
+                days: document.querySelector('input[name="days"]:checked').value,
+                customDays: Array.from(document.querySelectorAll('#customDays input:checked')).map(cb => cb.value),
+                morningStart: document.getElementById('morningStart').value,
+                morningEnd: document.getElementById('morningEnd').value,
+                eveningStart: document.getElementById('eveningStart').value,
+                eveningEnd: document.getElementById('eveningEnd').value,
+                refreshRate: document.getElementById('refreshRate').value
+            };
+            
+            localStorage.setItem('tubeMonitorSettings', JSON.stringify(settings));
+            
+            displayStatusMessage('Settings saved successfully!', 'success');
+        }
+        
+        // Load settings from localStorage
+        function loadSettings() {
+            const savedSettings = localStorage.getItem('tubeMonitorSettings');
+            
+            if (savedSettings) {
+                const settings = JSON.parse(savedSettings);
+                
+                // Set selected lines
+                settings.lines.forEach(lineId => {
+                    const checkbox = document.getElementById(`line-${lineId}`);
+                    if (checkbox) checkbox.checked = true;
+                });
+                
+                // Set days selection
+                const daysRadio = document.querySelector(`input[name="days"][value="${settings.days}"]`);
+                if (daysRadio) daysRadio.checked = true;
+                
+                // Set custom days
+                if (settings.customDays) {
+                    settings.customDays.forEach(day => {
+                        const checkbox = document.querySelector(`#customDays input[value="${day}"]`);
+                        if (checkbox) checkbox.checked = true;
+                    });
+                }
+                
+                // Set time windows
+                if (settings.morningStart) document.getElementById('morningStart').value = settings.morningStart;
+                if (settings.morningEnd) document.getElementById('morningEnd').value = settings.morningEnd;
+                if (settings.eveningStart) document.getElementById('eveningStart').value = settings.eveningStart;
+                if (settings.eveningEnd) document.getElementById('eveningEnd').value = settings.eveningEnd;
+                
+                // Set refresh rate
+                if (settings.refreshRate) document.getElementById('refreshRate').value = settings.refreshRate;
+            }
+        }
+        
+        // Toggle monitoring state
+        function toggleMonitoring() {
+            const button = document.getElementById('startMonitoring');
+            
+            if (monitoringActive) {
+                stopMonitoring();
+                button.textContent = 'Start Monitoring';
+                monitoringActive = false;
+            } else {
+                startMonitoring();
+                button.textContent = 'Stop Monitoring';
+                monitoringActive = true;
+            }
+        }
+        
+        // Start the monitoring process
+        function startMonitoring() {
+            // Check if we have selected lines
+            const selectedLines = Array.from(document.querySelectorAll('#lineSelection input:checked')).map(cb => cb.value);
+            if (selectedLines.length === 0) {
+                displayStatusMessage('Please select at least one tube line to monitor', 'error');
+                return;
+            }
+            
+            // Start by fetching statuses immediately
+            fetch
+            // Start by fetching statuses immediately
+            fetchTubeStatus();
+            
+            // Then set up timer for regular updates
+            const refreshRate = parseInt(document.getElementById('refreshRate').value, 10);
+            timer = setInterval(fetchTubeStatus, refreshRate);
+            
+            displayStatusMessage('Monitoring active. Will check for status updates every ' + 
+                (refreshRate / 60000) + ' minute(s)', 'success');
+        }
+        
+        // Stop the monitoring process
+        function stopMonitoring() {
+            if (timer) {
+                clearInterval(timer);
+                timer = null;
+            }
+            displayStatusMessage('Monitoring stopped', 'success');
+        }
+        
+        // Check if the current time is within monitoring windows
+        function isWithinMonitoringWindow() {
+            const now = new Date();
+            const currentDay = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            
+            // Check day selection
+            const daySelection = document.querySelector('input[name="days"]:checked').value;
+            
+            if (daySelection === 'weekdays' && (currentDay === 0 || currentDay === 6)) {
+                return false; // Weekend day, but only monitoring weekdays
+            }
+            
+            if (daySelection === 'weekends' && !(currentDay === 0 || currentDay === 6)) {
+                return false; // Weekday, but only monitoring weekends
+            }
+            
+            if (daySelection === 'custom') {
+                const selectedDays = Array.from(document.querySelectorAll('#customDays input:checked')).map(cb => parseInt(cb.value, 10));
+                if (!selectedDays.includes(currentDay)) {
+                    return false; // Current day not in selected custom days
+                }
+            }
+            
+            // Check time windows
+            const currentHour = now.getHours();
+            const currentMinute = now.getMinutes();
+            const currentTime = currentHour * 60 + currentMinute; // Convert to minutes since midnight
+            
+            const morningStart = timeToMinutes(document.getElementById('morningStart').value);
+            const morningEnd = timeToMinutes(document.getElementById('morningEnd').value);
+            const eveningStart = timeToMinutes(document.getElementById('eveningStart').value);
+            const eveningEnd = timeToMinutes(document.getElementById('eveningEnd').value);
+            
+            // Check if current time falls within either monitoring window
+            return (currentTime >= morningStart && currentTime <= morningEnd) || 
+                   (currentTime >= eveningStart && currentTime <= eveningEnd);
+        }
+        
+        // Convert HH:MM time to minutes since midnight
+        function timeToMinutes(timeString) {
+            const [hours, minutes] = timeString.split(':').map(Number);
+            return hours * 60 + minutes;
+        }
+        
+        // Fetch tube status from TfL API
+        function fetchTubeStatus() {
+            // Check if we're within monitoring window
+            if (!isWithinMonitoringWindow()) {
+                document.getElementById('tubeStatus').innerHTML = 
+                    '<div class="status-message">Outside monitoring time window. Monitoring will continue during your selected hours.</div>';
+                return;
+            }
+            
+            // Get selected lines
+            const selectedLines = Array.from(document.querySelectorAll('#lineSelection input:checked')).map(cb => cb.value);
+            
+            // Construct API URL with the fixed API key
+            const apiUrl = `https://api.tfl.gov.uk/Line/${selectedLines.join(',')}/Status?app_key=${API_KEY}`;
+            
+            // Show loading state
+            document.getElementById('tubeStatus').innerHTML = 
+                '<div class="status-message">Fetching tube status...</div>';
+            
+            // Fetch the data
+            fetch(apiUrl)
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP error! Status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    displayTubeStatus(data);
+                    checkForStatusChanges(data);
+                })
+                .catch(error => {
+                    console.error('Error fetching tube status:', error);
+                    document.getElementById('tubeStatus').innerHTML = 
+                        `<div class="status-message error">Error fetching tube status: ${error.message}</div>`;
+                });
+        }
+        
+        // Display tube status in the UI
+        function displayTubeStatus(data) {
+            const statusContainer = document.getElementById('tubeStatus');
+            statusContainer.innerHTML = '';
+            
+            if (data.length === 0) {
+                statusContainer.innerHTML = '<div class="status-message">No data available for selected lines.</div>';
+                return;
+            }
+            
+            data.forEach(line => {
+                const lineInfo = tubeLines.find(l => l.id === line.id);
+                if (!lineInfo) return;
+                
+                const status = line.lineStatuses[0];
+                
+                // Skip if status is Part Closure as requested
+                if (status.statusSeverityDescription === "Part Closure") {
+                    return;
+                }
+                
+                const lineElement = document.createElement('div');
+                lineElement.className = 'tube-line';
+                
+                const colorDiv = document.createElement('div');
+                colorDiv.className = 'line-color';
+                colorDiv.style.backgroundColor = lineInfo.color;
+                
+                const nameDiv = document.createElement('div');
+                nameDiv.className = 'line-name';
+                nameDiv.textContent = lineInfo.name;
+                
+                const statusDiv = document.createElement('div');
+                statusDiv.className = 'line-status';
+                statusDiv.textContent = status.statusSeverityDescription;
+                
+                // Style status based on severity
+                if (status.statusSeverity === 10) {
+                    // Good service
+                    statusDiv.classList.add('good-service');
+                } else if (status.statusSeverity === 9 || status.statusSeverity === 8) {
+                    // Minor delays
+                    statusDiv.classList.add('minor-delays');
+                } else {
+                    // Severe delays, suspended, etc.
+                    statusDiv.classList.add('severe-delays');
+                }
+                
+                lineElement.appendChild(colorDiv);
+                lineElement.appendChild(nameDiv);
+                lineElement.appendChild(statusDiv);
+                
+                statusContainer.appendChild(lineElement);
+            });
+        }
+        
+        // Check for status changes and send notifications
+        function checkForStatusChanges(data) {
+            data.forEach(line => {
+                const status = line.lineStatuses[0];
+                const lineInfo = tubeLines.find(l => l.id === line.id);
+                
+                if (!lineInfo) return;
+                
+                // Skip if status is Part Closure as requested
+                if (status.statusSeverityDescription === "Part Closure") {
+                    return;
+                }
+                
+                // Check if we have a previous status for this line
+                if (previousStatuses[line.id] !== undefined) {
+                    const prevStatus = previousStatuses[line.id];
+                    
+                    // If status changed from good to bad, or bad to good
+                    if (prevStatus !== status.statusSeverity) {
+                        // If changed from good service to something else
+                        if (prevStatus === 10 && status.statusSeverity !== 10) {
+                            sendNotification(
+                                `${lineInfo.name} Line: ${status.statusSeverityDescription}`,
+                                `Status changed from Good Service to ${status.statusSeverityDescription}.
+                                ${status.reason || ''}`
+                            );
+                        }
+                        // If changed from something else to good service
+                        else if (prevStatus !== 10 && status.statusSeverity === 10) {
+                            sendNotification(
+                                `${lineInfo.name} Line: Good Service Resumed`,
+                                `Service has returned to normal operation.`
+                            );
+                        }
+                    }
+                }
+                
+                // Update previous status
+                previousStatuses[line.id] = status.statusSeverity;
+            });
+        }
+        
+        // Send browser notification
+        function sendNotification(title, message) {
+            if ('Notification' in window && Notification.permission === 'granted') {
+                new Notification(title, {
+                    body: message,
+                    icon: '/favicon.ico' // You can add an icon for your app
+                });
+            }
+        }
+        
+        // Check notification permission and request if needed
+        function checkNotificationPermission() {
+            if ('Notification' in window) {
+                if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+                    document.getElementById('statusMessage').textContent = 
+                        'Please allow notifications to receive tube status alerts.';
+                    document.getElementById('statusMessage').style.display = 'block';
+                    document.getElementById('statusMessage').classList.add('warning');
+                    
+                    // Add a permission request button
+                    const permButton = document.createElement('button');
+                    permButton.textContent = 'Enable Notifications';
+                    permButton.style.marginTop = '10px';
+                    permButton.addEventListener('click', requestNotificationPermission);
+                    document.getElementById('statusMessage').appendChild(permButton);
+                }
+            }
+        }
+        
+        // Request notification permission
+        function requestNotificationPermission() {
+            Notification.requestPermission().then(permission => {
+                if (permission === 'granted') {
+                    document.getElementById('statusMessage').textContent = 
+                        'Notifications enabled. You will be alerted of tube status changes.';
+                    document.getElementById('statusMessage').classList.remove('warning');
+                    document.getElementById('statusMessage').classList.add('success');
+                    
+                    // Send a test notification
+                    sendNotification(
+                        'Tube Status Monitor',
+                        'Notifications are now enabled. You will be alerted when tube status changes.'
+                    );
+                }
+            });
+        }
+        
+        // Display status message
+        function displayStatusMessage(message, type) {
+            const statusMessage = document.getElementById('statusMessage');
+            statusMessage.textContent = message;
+            statusMessage.style.display = 'block';
+            
+            // Clear existing classes
+            statusMessage.className = 'status-message';
+            
+            // Add appropriate class
+            if (type) {
+                statusMessage.classList.add(type);
+            }
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                statusMessage.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
